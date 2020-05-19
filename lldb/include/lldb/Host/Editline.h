@@ -312,6 +312,10 @@ private:
   /// tab key is typed.
   unsigned char TabCommand(int ch);
 
+  unsigned char AdoptCompleteCommand(int ch);
+  unsigned char TypedCharacter(int ch, std::string typed);
+  std::string AutoSuggest(std::string typed);
+
   /// Respond to normal character insertion by fixing line indentation
   unsigned char FixIndentationCommand(int ch);
 
@@ -361,6 +365,7 @@ private:
   const char *m_fix_indentation_callback_chars = nullptr;
   CompleteCallbackType m_completion_callback = nullptr;
   void *m_completion_callback_baton = nullptr;
+  std::string m_add_completion = "";
 
   std::mutex m_output_mutex;
 };

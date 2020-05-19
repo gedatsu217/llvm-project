@@ -22,6 +22,7 @@
 #include "lldb/Utility/StreamString.h"
 #include "lldb/Utility/StringList.h"
 #include "lldb/Utility/Timeout.h"
+#include "lldb/Utility/AnsiTerminal.h"
 
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Threading.h"
@@ -1040,6 +1041,85 @@ unsigned char Editline::TabCommand(int ch) {
   return CC_REDISPLAY;
 }
 
+std::string Editline::AutoSuggest(std::string typed) {
+  const LineInfo *line_info = el_line(m_editline);
+
+
+  llvm::StringRef line(line_info->buffer,
+                       line_info->lastchar - line_info->buffer);
+  unsigned cursor_index = line_info->cursor - line_info->buffer;
+  CompletionResult result;
+  CompletionRequest request(line, cursor_index, result);
+
+  m_completion_callback(request, m_completion_callback_baton);
+
+  llvm::ArrayRef<CompletionResult::Completion> results = result.GetResults();
+
+  StringList completions;
+  result.GetMatches(completions);
+
+/*
+  if (results.size() == 0)
+    return CC_ERROR;*/
+
+  if (results.size() == 1) {
+    std::string to_add = "";
+    CompletionResult::Completion completion = results.front();
+    switch (completion.GetMode()) {
+    case CompletionMode::Normal: {
+      to_add = completion.GetCompletion();
+      to_add = to_add.substr(request.GetCursorArgumentPrefix().size());
+      if (request.GetParsedArg().IsQuoted())
+        to_add.push_back(request.GetParsedArg().GetQuoteChar());
+      to_add.push_back(' ');
+      m_add_completion = to_add;
+      /*
+      to_add = " "+to_add;
+      m_add_completion = to_add;
+      std::string temp =  ansi::FormatAnsiTerminalCodes("${ansi.faint}") + to_add + ansi::FormatAnsiTerminalCodes("${ansi.normal}");
+      printf("%s", temp.c_str());
+      fflush(stdout);*/
+      break;
+    }
+    case CompletionMode::Partial: {
+      std::string to_add = completion.GetCompletion();
+      to_add = to_add.substr(request.GetCursorArgumentPrefix().size());
+      el_insertstr(m_editline, to_add.c_str());
+      break;
+    }
+    case CompletionMode::RewriteLine: {
+      el_deletestr(m_editline, line_info->cursor - line_info->buffer);
+      el_insertstr(m_editline, completion.GetCompletion().c_str());
+      break;
+    }
+    }
+    return to_add;
+  }
+  return "";
+
+
+}
+
+unsigned char Editline::AdoptCompleteCommand(int ch) {
+  el_insertstr(m_editline, m_add_completion.c_str());
+  m_add_completion = "";
+  return CC_REDISPLAY;
+}
+
+
+unsigned char Editline::TypedCharacter(int ch, std::string typed) {
+  
+  el_insertstr(m_editline, typed.c_str());
+  printf("%s", typed.c_str());
+
+  std::string to_add = AutoSuggest(typed);
+  std::string temp = ansi::FormatAnsiTerminalCodes("${ansi.faint}") + to_add + ansi::FormatAnsiTerminalCodes("${ansi.normal}");
+  
+  printf("%s", temp.c_str());
+
+  return CC_REFRESH;
+}
+
 void Editline::ConfigureEditor(bool multiline) {
   if (m_editline && m_multiline_enabled == multiline)
     return;
@@ -1158,6 +1238,25 @@ void Editline::ConfigureEditor(bool multiline) {
          NULL); // Delete previous word, behave like bash in emacs mode
   el_set(m_editline, EL_BIND, "\t", "lldb-complete",
          NULL); // Bind TAB to auto complete
+
+  el_wset(m_editline, EL_ADDFN, EditLineConstString("lldb-adopt-complete"),
+          EditLineConstString("Adopt autocompletion"),
+          (EditlineCommandCallbackType)([](EditLine *editline, int ch) {
+            return Editline::InstanceFor(editline)->AdoptCompleteCommand(ch);
+          }));
+
+  el_set(m_editline, EL_BIND, "^k", "lldb-adopt-complete",
+         NULL); // Adopt a part that is suggested automatically
+
+  el_wset(m_editline, EL_ADDFN, EditLineConstString("lldb-typed-a"),
+          EditLineConstString("Typed a"),
+          (EditlineCommandCallbackType)([](EditLine *editline, int ch) {
+            std::string typed = "a";
+            return Editline::InstanceFor(editline)->TypedCharacter(ch, typed);
+          }));
+
+  el_set(m_editline, EL_BIND, "a", "lldb-typed-a",
+         NULL); // Bind "a"
 
   // Allow ctrl-left-arrow and ctrl-right-arrow for navigation, behave like
   // bash in emacs mode.
