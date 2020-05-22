@@ -1072,7 +1072,7 @@ std::string Editline::AutoSuggest(std::string typed) {
       if (request.GetParsedArg().IsQuoted())
         to_add.push_back(request.GetParsedArg().GetQuoteChar());
       to_add.push_back(' ');
-      m_add_completion = to_add;
+      
       /*
       to_add = " "+to_add;
       m_add_completion = to_add;
@@ -1108,14 +1108,24 @@ unsigned char Editline::AdoptCompleteCommand(int ch) {
 
 
 unsigned char Editline::TypedCharacter(int ch, std::string typed) {
-  
   el_insertstr(m_editline, typed.c_str());
-  printf("%s", typed.c_str());
-
-  std::string to_add = AutoSuggest(typed);
-  std::string temp = ansi::FormatAnsiTerminalCodes("${ansi.faint}") + to_add + ansi::FormatAnsiTerminalCodes("${ansi.normal}");
   
+
+  //if(m_add_completion.empty()) 
+
+  
+  std::string to_add = AutoSuggest(typed);
+  m_add_completion = to_add;
+
+  if(to_add.empty()){
+    return CC_REFRESH;
+  }
+  
+  std::string temp = ansi::FormatAnsiTerminalCodes("${ansi.faint}") + to_add + ansi::FormatAnsiTerminalCodes("${ansi.normal}");
+  printf("%s", typed.c_str());
   printf("%s", temp.c_str());
+  fflush(stdout);
+  MoveCursor(CursorLocation::BlockEnd, CursorLocation::EditingPrompt);
 
   return CC_REFRESH;
 }
@@ -1248,15 +1258,13 @@ void Editline::ConfigureEditor(bool multiline) {
   el_set(m_editline, EL_BIND, "^k", "lldb-adopt-complete",
          NULL); // Adopt a part that is suggested automatically
 
-  el_wset(m_editline, EL_ADDFN, EditLineConstString("lldb-typed-a"),
-          EditLineConstString("Typed a"),
+  el_wset(m_editline, EL_ADDFN, EditLineConstString("lldb-typed-character"),
+          EditLineConstString("Typed character"),
           (EditlineCommandCallbackType)([](EditLine *editline, int ch) {
-            std::string typed = "a";
+            std::string typed = std::string(1,ch);
+            typed = typed[0];
             return Editline::InstanceFor(editline)->TypedCharacter(ch, typed);
           }));
-
-  el_set(m_editline, EL_BIND, "a", "lldb-typed-a",
-         NULL); // Bind "a"
 
   // Allow ctrl-left-arrow and ctrl-right-arrow for navigation, behave like
   // bash in emacs mode.
@@ -1285,6 +1293,16 @@ void Editline::ConfigureEditor(bool multiline) {
     while (*indent_chars) {
       bind_key[0] = *indent_chars;
       el_set(m_editline, EL_BIND, bind_key, "lldb-fix-indentation", NULL);
+      ++indent_chars;
+    }
+  }
+
+  if (true) {
+    char bind_key[2] = {0, 0};
+    const char *indent_chars = "abcdefghijklmnopqrstuvwxzyABCDEFGHIJKLMNOPQRSTUVWXZY1234567890 ";
+    while (*indent_chars) {
+      bind_key[0] = *indent_chars;
+      el_set(m_editline, EL_BIND, bind_key, "lldb-typed-character", NULL);
       ++indent_chars;
     }
   }
