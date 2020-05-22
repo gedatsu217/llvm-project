@@ -1058,9 +1058,6 @@ std::string Editline::AutoSuggest(std::string typed) {
   StringList completions;
   result.GetMatches(completions);
 
-/*
-  if (results.size() == 0)
-    return CC_ERROR;*/
 
   if (results.size() == 1) {
     std::string to_add = "";
@@ -1072,13 +1069,6 @@ std::string Editline::AutoSuggest(std::string typed) {
       if (request.GetParsedArg().IsQuoted())
         to_add.push_back(request.GetParsedArg().GetQuoteChar());
       to_add.push_back(' ');
-      
-      /*
-      to_add = " "+to_add;
-      m_add_completion = to_add;
-      std::string temp =  ansi::FormatAnsiTerminalCodes("${ansi.faint}") + to_add + ansi::FormatAnsiTerminalCodes("${ansi.normal}");
-      printf("%s", temp.c_str());
-      fflush(stdout);*/
       break;
     }
     case CompletionMode::Partial: {
@@ -1109,16 +1099,15 @@ unsigned char Editline::AdoptCompleteCommand(int ch) {
 
 unsigned char Editline::TypedCharacter(int ch, std::string typed) {
   el_insertstr(m_editline, typed.c_str());
-  
-
   //if(m_add_completion.empty()) 
 
-  
+  //if(!m_add_completion.empty() && typed != m_add_completion.substr(0,1)) m_add_completion = "";
+
   std::string to_add = AutoSuggest(typed);
   m_add_completion = to_add;
 
   if(to_add.empty()){
-    return CC_REFRESH;
+    return CC_REDISPLAY;
   }
   
   std::string temp = ansi::FormatAnsiTerminalCodes("${ansi.faint}") + to_add + ansi::FormatAnsiTerminalCodes("${ansi.normal}");
