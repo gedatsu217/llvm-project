@@ -315,6 +315,7 @@ private:
   unsigned char AdoptCompleteCommand(int ch);
   unsigned char TypedCharacter(int ch, std::string typed);
   std::string AutoSuggest(std::string typed);
+  unsigned char Experience(int ch);
 
   /// Respond to normal character insertion by fixing line indentation
   unsigned char FixIndentationCommand(int ch);
@@ -366,6 +367,7 @@ private:
   CompleteCallbackType m_completion_callback = nullptr;
   void *m_completion_callback_baton = nullptr;
   std::string m_add_completion = "";
+  unsigned string_count = 0;
 
   std::mutex m_output_mutex;
 };

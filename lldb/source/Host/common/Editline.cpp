@@ -290,6 +290,22 @@ public:
     return false;
   }
 
+  const EditLineCharType *Suggest(EditLineStringType line) {
+    int res = history_w(m_history, &m_event, H_PREV_STR, line.c_str());
+    if(res == -1){
+      res = history_w(m_history, &m_event, H_NEXT_STR, line.c_str());
+      if(res == -1) 
+        return nullptr;
+    }
+  
+    return m_event.str;
+  }
+
+  int Size() {
+    history_w(m_history, &m_event, H_GETSIZE);
+    return m_event.num;
+  }
+
 protected:
   HistoryW *m_history; // The history object
   HistEventW m_event;  // The history event needed to contain all history events
@@ -1044,7 +1060,6 @@ unsigned char Editline::TabCommand(int ch) {
 std::string Editline::AutoSuggest(std::string typed) {
   const LineInfo *line_info = el_line(m_editline);
 
-
   llvm::StringRef line(line_info->buffer,
                        line_info->lastchar - line_info->buffer);
   unsigned cursor_index = line_info->cursor - line_info->buffer;
@@ -1058,9 +1073,9 @@ std::string Editline::AutoSuggest(std::string typed) {
   StringList completions;
   result.GetMatches(completions);
 
+  std::string to_add = "";
 
   if (results.size() == 1) {
-    std::string to_add = "";
     CompletionResult::Completion completion = results.front();
     switch (completion.GetMode()) {
     case CompletionMode::Normal: {
@@ -1074,7 +1089,6 @@ std::string Editline::AutoSuggest(std::string typed) {
     case CompletionMode::Partial: {
       std::string to_add = completion.GetCompletion();
       to_add = to_add.substr(request.GetCursorArgumentPrefix().size());
-      el_insertstr(m_editline, to_add.c_str());
       break;
     }
     case CompletionMode::RewriteLine: {
@@ -1083,11 +1097,9 @@ std::string Editline::AutoSuggest(std::string typed) {
       break;
     }
     }
-    return to_add;
   }
-  return "";
 
-
+  return to_add;
 }
 
 unsigned char Editline::AdoptCompleteCommand(int ch) {
@@ -1099,22 +1111,93 @@ unsigned char Editline::AdoptCompleteCommand(int ch) {
 
 unsigned char Editline::TypedCharacter(int ch, std::string typed) {
   el_insertstr(m_editline, typed.c_str());
-  //if(m_add_completion.empty()) 
+  string_count++;
 
-  //if(!m_add_completion.empty() && typed != m_add_completion.substr(0,1)) m_add_completion = "";
+  const LineInfo *line_info = el_line(m_editline);
+  llvm::StringRef now_line(line_info->buffer,
+                       line_info->lastchar - line_info->buffer);
+  unsigned cursor_index = line_info->cursor - line_info->buffer;
+  std::string line_with_char = now_line.str();
 
-  std::string to_add = AutoSuggest(typed);
-  m_add_completion = to_add;
-
-  if(to_add.empty()){
-    return CC_REDISPLAY;
+  if(string_count != cursor_index){
+    string_count=cursor_index;
+    m_add_completion = "";
   }
+
+  auto w_line = std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(line_with_char);
+  auto *res = m_history_sp->Suggest(w_line);
+
+  std::string to_add;
   
+
+  
+  if(res != nullptr) {
+
+    std::wstring history_line = res;
+    
+    history_line = history_line.substr(cursor_index, history_line.length() - cursor_index - 1);
+    
+    to_add = std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(history_line);
+    
+    if(m_add_completion.length()>1 && to_add != m_add_completion.substr(1)){
+      m_add_completion = to_add;
+      return CC_REDISPLAY;
+    }
+    m_add_completion = to_add;
+
+    /*
+    if(to_add.empty()){ //前回と違うものがサジェストされたとき対策をしなきゃならない
+      return CC_REDISPLAY;
+    }*/
+
+    //明日はバックスペース用のbindを作る
+
+  }
+
+  else {
+    to_add = AutoSuggest(typed);
+    m_add_completion = to_add;
+
+    if(to_add.empty()){
+      m_add_completion = "";
+      return CC_REDISPLAY;
+    }
+  }
+
   std::string temp = ansi::FormatAnsiTerminalCodes("${ansi.faint}") + to_add + ansi::FormatAnsiTerminalCodes("${ansi.normal}");
   printf("%s", typed.c_str());
   printf("%s", temp.c_str());
   fflush(stdout);
   MoveCursor(CursorLocation::BlockEnd, CursorLocation::EditingPrompt);
+
+  return CC_REFRESH;
+}
+
+unsigned char Editline::Experience(int ch) {
+  /*
+  const LineInfo *line_info = el_line(m_editline);
+  llvm::StringRef old_line(line_info->buffer,
+                       line_info->lastchar - line_info->buffer);
+  std::string line_with_char = old_line.str();
+
+  auto w_line = std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(line_with_char);
+  auto *res = m_history_sp->Suggest(w_line);
+  std::wstring history_line = res;
+  history_line = history_line.substr(line_info->cursor - line_info->buffer, history_line.length() - (line_info->cursor - line_info->buffer) - 1);
+  
+  m_add_completion = std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(history_line);
+  
+  printf("%s", ansi::FormatAnsiTerminalCodes("${ansi.faint}").c_str());
+  fflush(stdout);
+  printf("%ls", history_line.c_str());
+  fflush(stdout);
+  printf("%s", ansi::FormatAnsiTerminalCodes("${ansi.normal}").c_str());
+  fflush(stdout);*/
+
+  //el_deletestr(m_editline, 2);
+  int res = m_history_sp->Size();
+  printf("%d",res);
+  fflush(stdout);
 
   return CC_REFRESH;
 }
@@ -1254,6 +1337,15 @@ void Editline::ConfigureEditor(bool multiline) {
             typed = typed[0];
             return Editline::InstanceFor(editline)->TypedCharacter(ch, typed);
           }));
+
+  el_wset(m_editline, EL_ADDFN, EditLineConstString("lldb-experience"),
+          EditLineConstString("Experience"),
+          (EditlineCommandCallbackType)([](EditLine *editline, int ch) {
+            return Editline::InstanceFor(editline)->Experience(ch);
+          }));
+
+  el_set(m_editline, EL_BIND, "^l", "lldb-experience",
+         NULL); // Adopt a part that is suggested automatically
 
   // Allow ctrl-left-arrow and ctrl-right-arrow for navigation, behave like
   // bash in emacs mode.
