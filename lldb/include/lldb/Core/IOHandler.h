@@ -202,6 +202,9 @@ public:
 
   virtual void IOHandlerDeactivated(IOHandler &io_handler) {}
 
+  virtual void IOHandlerSuggestion(IOHandler &io_handler, llvm::StringRef line,
+                                   std::string &result);
+
   virtual void IOHandlerComplete(IOHandler &io_handler,
                                  CompletionRequest &request);
 
@@ -418,6 +421,9 @@ private:
 
   static int FixIndentationCallback(Editline *editline, const StringList &lines,
                                     int cursor_position, void *baton);
+
+  static void SuggestionCallback(llvm::StringRef line, std::string &result,
+                                 void *baton);
 
   static void AutoCompleteCallback(CompletionRequest &request, void *baton);
 #endif

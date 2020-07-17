@@ -195,6 +195,15 @@ void IOHandlerConfirm::IOHandlerInputComplete(IOHandler &io_handler,
   }
 }
 
+void IOHandlerDelegate::IOHandlerSuggestion(IOHandler &io_handler,
+                                            llvm::StringRef line,
+                                            std::string &result) {
+  if (auto res = io_handler.GetDebugger()
+                     .GetCommandInterpreter()
+                     .GetAutoSuggestionForCommand(line))
+    result = res.getValue();
+}
+
 void IOHandlerDelegate::IOHandlerComplete(IOHandler &io_handler,
                                           CompletionRequest &request) {
   switch (m_completion) {
@@ -258,6 +267,8 @@ IOHandlerEditline::IOHandlerEditline(
                                      m_color_prompts));
     m_editline_up->SetIsInputCompleteCallback(IsInputCompleteCallback, this);
     m_editline_up->SetAutoCompleteCallback(AutoCompleteCallback, this);
+    if (debugger.GetUseAutosuggestion())
+      m_editline_up->SetSuggestionCallback(SuggestionCallback, this);
     // See if the delegate supports fixing indentation
     const char *indent_chars = delegate.IOHandlerGetFixIndentationCharacters();
     if (indent_chars) {
@@ -427,6 +438,14 @@ int IOHandlerEditline::FixIndentationCallback(Editline *editline,
   IOHandlerEditline *editline_reader = (IOHandlerEditline *)baton;
   return editline_reader->m_delegate.IOHandlerFixIndentation(
       *editline_reader, lines, cursor_position);
+}
+
+void IOHandlerEditline::SuggestionCallback(llvm::StringRef line,
+                                           std::string &result, void *baton) {
+  IOHandlerEditline *editline_reader = static_cast<IOHandlerEditline *>(baton);
+  if (editline_reader)
+    editline_reader->m_delegate.IOHandlerSuggestion(*editline_reader, line,
+                                                    result);
 }
 
 void IOHandlerEditline::AutoCompleteCallback(CompletionRequest &request,
