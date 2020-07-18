@@ -290,6 +290,56 @@ public:
     return false;
   }
 
+  std::vector<std::string> HistoryList() {
+    this->Load();
+    std::vector<std::string> v;
+    if(m_history) {
+      const char *path = GetHistoryFilePath();
+      if(path) {
+        history_w(m_history, &m_event, H_GETSIZE);
+        int num = m_event.num;
+        for(int i=0; i<num; ++i) {
+          history_w(m_history, &m_event, H_SET, i);
+          history_w(m_history, &m_event, H_CURR);
+          std::string temp = std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(m_event.str);
+          temp = temp.substr(0,temp.length()-1);
+          v.push_back(temp);
+        }
+      }
+    }
+    return v;
+  }
+
+  std::vector<std::string> Size() {
+    this->Load();
+    std::vector<std::string> v;
+    if(m_history){
+      const char *path = GetHistoryFilePath();
+      if(path) {
+        history_w(m_history, &m_event, H_GETSIZE);
+        int num = m_event.num;
+        for(int i=0; i<num; ++i) {
+          history_w(m_history, &m_event, H_SET, i);
+          history_w(m_history, &m_event, H_CURR);
+          //history_w(m_history, &m_event, H_PREV_EVENT, i);
+          std::string temp = std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(m_event.str);
+          //v.push_back("breakpoint");
+          v.push_back(temp);
+        }
+      }
+    }
+    return v;
+      /*
+      if(path) {
+        history_w(m_history, &m_event, H_LAST);
+        std::string temp = std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(m_event.str);
+        return temp;
+      }
+    }
+    std::string a = "hello";
+    return a;*/
+  }
+
 protected:
   HistoryW *m_history; // The history object
   HistEventW m_event;  // The history event needed to contain all history events
@@ -1078,6 +1128,15 @@ unsigned char Editline::TypedCharacter(int ch) {
   return CC_REFRESH;
 }
 
+unsigned char Editline::Experience(int ch) {
+  std::vector<std::string> res = m_history_sp->Size();
+  for(auto x:res) {
+    printf("%s", x.c_str());
+    fflush(stdout);
+  }
+  return CC_REFRESH;
+}
+
 void Editline::ConfigureEditor(bool multiline) {
   if (m_editline && m_multiline_enabled == multiline)
     return;
@@ -1229,6 +1288,15 @@ void Editline::ConfigureEditor(bool multiline) {
   el_set(m_editline, EL_BIND, "\t", "lldb-complete",
          NULL); // Bind TAB to auto complete
 
+  el_wset(m_editline, EL_ADDFN, EditLineConstString("lldb-num"),
+          EditLineConstString("Experience"),
+          (EditlineCommandCallbackType)([](EditLine *editline, int ch) {
+            return Editline::InstanceFor(editline)->Experience(ch);
+          }));
+
+  el_set(m_editline, EL_BIND, "^l", "lldb-num",
+          NULL); // Apply a part that is suggested automatically
+
   // Allow ctrl-left-arrow and ctrl-right-arrow for navigation, behave like
   // bash in emacs mode.
   el_set(m_editline, EL_BIND, ESCAPE "[1;5C", "em-next-word", NULL);
@@ -1308,6 +1376,11 @@ void Editline::ConfigureEditor(bool multiline) {
 }
 
 // Editline public methods
+
+std::vector<std::string> Editline::AddHistory() {
+  std::vector<std::string> v = m_history_sp->HistoryList();
+  return v;
+}
 
 Editline *Editline::InstanceFor(EditLine *editline) {
   Editline *editor;

@@ -125,6 +125,18 @@ CommandInterpreter::CommandInterpreter(Debugger &debugger,
   m_collection_sp->Initialize(g_interpreter_properties);
 }
 
+void CommandInterpreter::addhis(std::vector<std::string> v) {
+  //printf("hello");
+  //fflush(stdout);
+  for(std::string x : v) {
+    //printf("hello");
+    //fflush(stdout);
+    this->m_command_history.AppendString(x);
+  }
+  //std::string a = std::to_string(v.size());
+  //this->m_command_history.AppendString(a);
+}
+
 bool CommandInterpreter::GetExpandRegexAliases() const {
   const uint32_t idx = ePropertyExpandRegexAliases;
   return m_collection_sp->GetPropertyAtIndexAsBoolean(
@@ -1869,7 +1881,7 @@ void CommandInterpreter::HandleCompletion(CompletionRequest &request) {
 llvm::Optional<std::string>
 CommandInterpreter::GetAutoSuggestionForCommand(llvm::StringRef line) {
   const size_t s = m_command_history.GetSize();
-  for (size_t i = 0; i < s; ++i) {
+  for (int i = s-1; i >= 0; --i) {
     llvm::StringRef entry = m_command_history.GetStringAtIndex(i);
     if (entry.consume_front(line))
       return entry.str();

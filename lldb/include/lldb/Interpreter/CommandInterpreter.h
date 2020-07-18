@@ -486,6 +486,8 @@ public:
   const char *GetCommandPrefix();
 
   // Properties
+  void addhis(std::vector<std::string> v); 
+
   bool GetExpandRegexAliases() const;
 
   bool GetPromptOnQuit() const;

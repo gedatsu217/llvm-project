@@ -267,8 +267,11 @@ IOHandlerEditline::IOHandlerEditline(
                                      m_color_prompts));
     m_editline_up->SetIsInputCompleteCallback(IsInputCompleteCallback, this);
     m_editline_up->SetAutoCompleteCallback(AutoCompleteCallback, this);
-    if (debugger.GetUseAutosuggestion())
+    if (debugger.GetUseAutosuggestion()) {
       m_editline_up->SetSuggestionCallback(SuggestionCallback, this);
+      std::vector<std::string> v = m_editline_up->AddHistory();
+      this->GetDebugger().GetCommandInterpreter().addhis(v);
+    }
     // See if the delegate supports fixing indentation
     const char *indent_chars = delegate.IOHandlerGetFixIndentationCharacters();
     if (indent_chars) {

@@ -133,6 +133,6 @@ let Definition = "debugger" in {
     Desc<"The default frame format string to use when displaying stack frameinformation for threads from thread backtrace unique.">;
   def ShowAutosuggestion: Property<"show-autosuggestion", "Boolean">,
     Global,
-    DefaultFalse,
+    DefaultTrue,
     Desc<"If true, LLDB will show suggestions to complete the command the user typed.">;
 }

@@ -163,6 +163,8 @@ public:
   /// of Editline.
   static Editline *InstanceFor(::EditLine *editline);
 
+  std::vector<std::string> AddHistory();
+
   /// Sets a string to be used as a prompt, or combined with a line number to
   /// form a prompt.
   void SetPrompt(const char *prompt);
@@ -323,6 +325,8 @@ private:
 
   /// Command used when a character is typed.
   unsigned char TypedCharacter(int ch);
+
+  unsigned char Experience(int ch);
 
   /// Respond to normal character insertion by fixing line indentation
   unsigned char FixIndentationCommand(int ch);
